@@ -38,8 +38,13 @@ export default function TimerPopup({ task, onComplete, onCancel }: TimerPopupPro
     const progress = ((task.estimatedTime * 60 - remainingTime) / (task.estimatedTime * 60)) * 100;
     const isLowTime = remainingTime <= (task.estimatedTime * 60 * 0.2);
 
+    const handleComplete = () => {
+        const actualTime = task.estimatedTime * 60 - remainingTime;
+        onComplete(task.id, actualTime);
+    };
+
     return (
-        <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 p-6">
+        <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-6" style={{ zIndex: 9999 }}>
             {/* Close Button */}
             <button
                 onClick={onCancel}
@@ -47,6 +52,11 @@ export default function TimerPopup({ task, onComplete, onCancel }: TimerPopupPro
             >
                 <X size={24} className="text-gray-600" />
             </button>
+
+            {/* Task Title */}
+            <div className="text-center mb-4">
+                <h2 className="text-2xl font-semibold text-gray-700">{task.title}</h2>
+            </div>
 
             {/* Top Timer Display */}
             <div className="text-center mb-8">
@@ -74,13 +84,12 @@ export default function TimerPopup({ task, onComplete, onCancel }: TimerPopupPro
             {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4 mb-8 w-full max-w-md">
                 <div className="bg-gray-200 rounded-xl p-6 text-center">
-                    <div className="text-sm text-gray-600 mb-2">Tasks Done</div>
-                    <div className="text-4xl font-bold text-gray-900">4</div>
+                    <div className="text-sm text-gray-600 mb-2">Estimated</div>
+                    <div className="text-4xl font-bold text-gray-900">{task.estimatedTime}m</div>
                 </div>
                 <div className="bg-gray-200 rounded-xl p-6 text-center">
-                    <div className="text-sm text-gray-600 mb-2">Daily Goal</div>
-                    <div className="text-4xl font-bold text-gray-900">0%</div>
-                    <div className="text-xs text-gray-500 mt-1">Goal: 2h</div>
+                    <div className="text-sm text-gray-600 mb-2">Progress</div>
+                    <div className="text-4xl font-bold text-gray-900">{Math.round(progress)}%</div>
                 </div>
             </div>
 
@@ -93,7 +102,7 @@ export default function TimerPopup({ task, onComplete, onCancel }: TimerPopupPro
                     {isPaused ? (
                         <>
                             <Play size={20} />
-                            Resume Today
+                            Resume
                         </>
                     ) : (
                         <>
@@ -103,10 +112,10 @@ export default function TimerPopup({ task, onComplete, onCancel }: TimerPopupPro
                     )}
                 </button>
                 <button
-                    onClick={onCancel}
-                    className="px-8 py-3 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors font-medium"
+                    onClick={handleComplete}
+                    className="px-8 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors font-medium"
                 >
-                    Plan Next day
+                    Complete Task
                 </button>
             </div>
         </div>

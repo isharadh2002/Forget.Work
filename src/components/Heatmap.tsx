@@ -3,9 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { getDailyStats } from '@/lib/storage';
+import { DailyStats } from '@/types/taskTypes';
 
 export default function Heatmap() {
-    const [stats, setStats] = useState<Record<string, any>>({});
+    const [stats, setStats] = useState<Record<string, DailyStats>>({});
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
