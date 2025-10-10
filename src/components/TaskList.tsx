@@ -4,13 +4,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { Task } from '@/types/taskTypes';
 import { getTasks, saveTasks } from '@/lib/storage';
-import { Trash2, HelpCircle, Settings, RotateCw } from 'lucide-react';
+import { Trash2, HelpCircle, Settings, RotateCw, Pencil } from 'lucide-react';
 import AddTaskForm from './AddTaskForm';
+import EditTaskForm from './EditTaskForm';
 import { TimerWindowManager } from '@/lib/timerWindowManager';
 
 export default function TaskList() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const timerManagerRef = useRef<TimerWindowManager | null>(null);
@@ -57,14 +59,29 @@ export default function TaskList() {
         setShowAddForm(false);
     };
 
+    const editTask = (id: string, title: string, estimatedTime: number) => {
+        setTasks(prevTasks => prevTasks.map(t =>
+            t.id === id ? { ...t, title, estimatedTime } : t
+        ));
+        setEditingTaskId(null);
+    };
+
     const deleteTask = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         setTasks(tasks.filter(t => t.id !== id));
         if (selectedTaskId === id) setSelectedTaskId(null);
+        if (editingTaskId === id) setEditingTaskId(null);
     };
 
     const selectTask = (taskId: string) => {
+        if (editingTaskId) return; // Don't select if editing
         setSelectedTaskId(taskId);
+    };
+
+    const startEditTask = (taskId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditingTaskId(taskId);
+        setSelectedTaskId(null);
     };
 
     const startFocusTimer = () => {
@@ -114,25 +131,42 @@ export default function TaskList() {
 
                 <div className="space-y-2 mb-4">
                     {activeTasks.map(task => (
-                        <div
-                            key={task.id}
-                            onClick={() => selectTask(task.id)}
-                            className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-all ${selectedTaskId === task.id
-                                ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700'
-                                }`}
-                        >
-                            <span className="text-gray-800 dark:text-gray-200">{task.title}</span>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500 dark:text-gray-400">{task.estimatedTime}m</span>
-                                <button
-                                    onClick={(e) => deleteTask(task.id, e)}
-                                    className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                        editingTaskId === task.id ? (
+                            <EditTaskForm
+                                key={task.id}
+                                task={task}
+                                onSave={editTask}
+                                onCancel={() => setEditingTaskId(null)}
+                            />
+                        ) : (
+                            <div
+                                key={task.id}
+                                onClick={() => selectTask(task.id)}
+                                className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-all ${selectedTaskId === task.id
+                                    ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
+                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700'
+                                    }`}
+                            >
+                                <span className="text-gray-800 dark:text-gray-200">{task.title}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">{task.estimatedTime}m</span>
+                                    <button
+                                        onClick={(e) => startEditTask(task.id, e)}
+                                        className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                        title="Edit task"
+                                    >
+                                        <Pencil size={16} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => deleteTask(task.id, e)}
+                                        className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                        title="Delete task"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        )
                     ))}
 
                     {showAddForm ? (
