@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Task } from '@/types/taskTypes';
 import { getTasks, saveTasks } from '@/lib/storage';
-import { Trash2, HelpCircle, Sun, Settings, RotateCw } from 'lucide-react';
+import { Trash2, HelpCircle, Settings, RotateCw } from 'lucide-react';
 import AddTaskForm from './AddTaskForm';
 import { TimerWindowManager } from '@/lib/timerWindowManager';
 
@@ -19,10 +19,8 @@ export default function TaskList() {
         setMounted(true);
         setTasks(getTasks());
 
-        // Initialize timer manager
         timerManagerRef.current = new TimerWindowManager(handleCompleteTask);
 
-        // Cleanup on unmount
         return () => {
             if (timerManagerRef.current) {
                 timerManagerRef.current.cleanup();
@@ -36,7 +34,6 @@ export default function TaskList() {
         }
     }, [tasks, mounted]);
 
-    // Listen for messages from popup window
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             if (event.data.type === 'TASK_COMPLETE') {
@@ -108,11 +105,11 @@ export default function TaskList() {
     if (!mounted) return null;
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
             <div className="p-6">
                 <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
-                    <p className="text-sm text-gray-500">30m → 4:47 PM</p>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tasks</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">30m → 4:47 PM</p>
                 </div>
 
                 <div className="space-y-2 mb-4">
@@ -121,16 +118,16 @@ export default function TaskList() {
                             key={task.id}
                             onClick={() => selectTask(task.id)}
                             className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-all ${selectedTaskId === task.id
-                                ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400'
-                                : 'hover:bg-gray-50 border-gray-100'
+                                ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700'
                                 }`}
                         >
-                            <span className="text-gray-800">{task.title}</span>
+                            <span className="text-gray-800 dark:text-gray-200">{task.title}</span>
                             <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-500">{task.estimatedTime}m</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">{task.estimatedTime}m</span>
                                 <button
                                     onClick={(e) => deleteTask(task.id, e)}
-                                    className="text-gray-400 hover:text-red-600 transition-colors"
+                                    className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                 >
                                     <Trash2 size={16} />
                                 </button>
@@ -146,7 +143,7 @@ export default function TaskList() {
                     ) : (
                         <button
                             onClick={() => setShowAddForm(true)}
-                            className="w-full p-3 text-center text-gray-400 hover:bg-gray-50 rounded border border-dashed border-gray-300 transition-colors"
+                            className="w-full p-3 text-center text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded border border-dashed border-gray-300 dark:border-gray-700 transition-colors"
                         >
                             +
                         </button>
@@ -156,39 +153,39 @@ export default function TaskList() {
                 {selectedTaskId && (
                     <button
                         onClick={startFocusTimer}
-                        className="w-full mb-4 px-4 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                        className="w-full mb-4 px-4 py-3 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-medium"
                     >
                         Start Focus Timer
                     </button>
                 )}
 
                 {completedTasks.length > 0 && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-3">Completed Tasks</h3>
+                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Completed Tasks</h3>
                         <div className="space-y-2">
                             {completedTasks.map(task => (
                                 <div
                                     key={task.id}
-                                    className="flex items-center justify-between p-3 rounded border border-gray-100 bg-gray-50"
+                                    className="flex items-center justify-between p-3 rounded border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <span className="text-green-600">✓</span>
-                                        <span className="text-gray-500 line-through">{task.title}</span>
+                                        <span className="text-green-600 dark:text-green-400">✓</span>
+                                        <span className="text-gray-500 dark:text-gray-400 line-through">{task.title}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-xs text-gray-400 dark:text-gray-500">
                                             {task.actualTime ? `${Math.floor(task.actualTime / 60)}m ${task.actualTime % 60}s` : `${task.estimatedTime}m`}
                                         </span>
                                         <button
                                             onClick={(e) => moveTaskToPending(task.id, e)}
-                                            className="text-gray-400 hover:text-blue-700 transition-colors"
+                                            className="text-gray-400 dark:text-gray-500 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
                                             title="Do it again"
                                         >
                                             <RotateCw size={16} />
                                         </button>
                                         <button
                                             onClick={(e) => deleteTask(task.id, e)}
-                                            className="text-gray-400 hover:text-red-600 transition-colors"
+                                            className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                             title='Delete task'
                                         >
                                             <Trash2 size={16} />
@@ -200,20 +197,17 @@ export default function TaskList() {
                     </div>
                 )}
 
-                <div className="flex justify-center items-center gap-6 pt-4 border-t border-gray-100">
-                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                <div className="flex justify-center items-center gap-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                         <HelpCircle size={20} />
                     </button>
-                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                        <Sun size={20} />
-                    </button>
-                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                         <Settings size={20} />
                     </button>
                 </div>
 
-                <div className="text-center mt-4 pt-4 border-t border-gray-100">
-                    <button className="text-sm text-gray-500 hover:text-gray-700">
+                <div className="text-center mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <button className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
                         Manage Subscription
                     </button>
                 </div>
