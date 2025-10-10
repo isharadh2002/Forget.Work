@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Task } from '@/types/taskTypes';
 import { getTasks, saveTasks } from '@/lib/storage';
-import { Trash2, HelpCircle, Sun, Settings } from 'lucide-react';
+import { Trash2, HelpCircle, Sun, Settings, RotateCw } from 'lucide-react';
 import AddTaskForm from './AddTaskForm';
 import { TimerWindowManager } from '@/lib/timerWindowManager';
 
@@ -93,6 +93,15 @@ export default function TaskList() {
         setSelectedTaskId(null);
     };
 
+    const moveTaskToPending = (taskId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setTasks(prevTasks => prevTasks.map(t =>
+            t.id === taskId
+                ? { ...t, completed: false, actualTime: undefined, completedAt: undefined }
+                : t
+        ));
+    };
+
     const activeTasks = tasks.filter(t => !t.completed);
     const completedTasks = tasks.filter(t => t.completed);
 
@@ -112,8 +121,8 @@ export default function TaskList() {
                             key={task.id}
                             onClick={() => selectTask(task.id)}
                             className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-all ${selectedTaskId === task.id
-                                    ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400'
-                                    : 'hover:bg-gray-50 border-gray-100'
+                                ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400'
+                                : 'hover:bg-gray-50 border-gray-100'
                                 }`}
                         >
                             <span className="text-gray-800">{task.title}</span>
@@ -171,8 +180,16 @@ export default function TaskList() {
                                             {task.actualTime ? `${Math.floor(task.actualTime / 60)}m ${task.actualTime % 60}s` : `${task.estimatedTime}m`}
                                         </span>
                                         <button
+                                            onClick={(e) => moveTaskToPending(task.id, e)}
+                                            className="text-gray-400 hover:text-blue-700 transition-colors"
+                                            title="Do it again"
+                                        >
+                                            <RotateCw size={16} />
+                                        </button>
+                                        <button
                                             onClick={(e) => deleteTask(task.id, e)}
                                             className="text-gray-400 hover:text-red-600 transition-colors"
+                                            title='Delete task'
                                         >
                                             <Trash2 size={16} />
                                         </button>
