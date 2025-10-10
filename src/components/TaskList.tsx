@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Task } from '@/types/taskTypes';
 import { getTasks, saveTasks } from '@/lib/storage';
-import { Trash2, HelpCircle, Settings, RotateCw, Pencil } from 'lucide-react';
+import { Trash2, HelpCircle, Settings, RotateCw, Pencil, GripVertical } from 'lucide-react';
 import AddTaskForm from './AddTaskForm';
 import EditTaskForm from './EditTaskForm';
 import { TimerWindowManager } from '@/lib/timerWindowManager';
@@ -15,6 +15,8 @@ export default function TaskList() {
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+    const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
     const timerManagerRef = useRef<TimerWindowManager | null>(null);
 
     useEffect(() => {
@@ -74,7 +76,7 @@ export default function TaskList() {
     };
 
     const selectTask = (taskId: string) => {
-        if (editingTaskId) return; // Don't select if editing
+        if (editingTaskId) return;
         setSelectedTaskId(taskId);
     };
 
@@ -116,6 +118,59 @@ export default function TaskList() {
         ));
     };
 
+    // Drag and Drop handlers
+    const handleDragStart = (e: React.DragEvent, taskId: string) => {
+        setDraggedTaskId(taskId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+    };
+
+    const handleDragOver = (e: React.DragEvent, taskId: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        if (draggedTaskId && draggedTaskId !== taskId) {
+            setDragOverTaskId(taskId);
+        }
+    };
+
+    const handleDragLeave = () => {
+        setDragOverTaskId(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, dropTaskId: string) => {
+        e.preventDefault();
+        setDragOverTaskId(null);
+
+        if (!draggedTaskId || draggedTaskId === dropTaskId) {
+            setDraggedTaskId(null);
+            return;
+        }
+
+        const activeTasks = tasks.filter(t => !t.completed);
+        const completedTasks = tasks.filter(t => t.completed);
+
+        const draggedIndex = activeTasks.findIndex(t => t.id === draggedTaskId);
+        const dropIndex = activeTasks.findIndex(t => t.id === dropTaskId);
+
+        if (draggedIndex === -1 || dropIndex === -1) {
+            setDraggedTaskId(null);
+            return;
+        }
+
+        const newActiveTasks = [...activeTasks];
+        const [draggedTask] = newActiveTasks.splice(draggedIndex, 1);
+        newActiveTasks.splice(dropIndex, 0, draggedTask);
+
+        setTasks([...newActiveTasks, ...completedTasks]);
+        setDraggedTaskId(null);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedTaskId(null);
+        setDragOverTaskId(null);
+    };
+
     const activeTasks = tasks.filter(t => !t.completed);
     const completedTasks = tasks.filter(t => t.completed);
 
@@ -141,13 +196,28 @@ export default function TaskList() {
                         ) : (
                             <div
                                 key={task.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, task.id)}
+                                onDragOver={(e) => handleDragOver(e, task.id)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, task.id)}
+                                onDragEnd={handleDragEnd}
                                 onClick={() => selectTask(task.id)}
-                                className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-all ${selectedTaskId === task.id
-                                    ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
-                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700'
+                                className={`flex items-center justify-between p-3 rounded border cursor-move transition-all ${draggedTaskId === task.id
+                                    ? 'opacity-50'
+                                    : ''
+                                    } ${dragOverTaskId === task.id
+                                        ? 'border-blue-400 dark:border-blue-600 border-t-2'
+                                        : ''
+                                    } ${selectedTaskId === task.id
+                                        ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
+                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700'
                                     }`}
                             >
-                                <span className="text-gray-800 dark:text-gray-200">{task.title}</span>
+                                <div className="flex items-center gap-2">
+                                    <GripVertical size={16} className="text-gray-400 dark:text-gray-500" />
+                                    <span className="text-gray-800 dark:text-gray-200">{task.title}</span>
+                                </div>
                                 <div className="flex items-center gap-3">
                                     <span className="text-sm text-gray-500 dark:text-gray-400">{task.estimatedTime}m</span>
                                     <button
