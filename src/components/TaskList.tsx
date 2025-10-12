@@ -8,6 +8,7 @@ import { Trash2, HelpCircle, Settings, RotateCw, Pencil, GripVertical } from 'lu
 import AddTaskForm from './AddTaskForm';
 import EditTaskForm from './EditTaskForm';
 import { TimerWindowManager } from '@/lib/timerWindowManager';
+import { Reorder } from 'framer-motion';
 
 export default function TaskList() {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -15,8 +16,7 @@ export default function TaskList() {
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
-    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-    const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const timerManagerRef = useRef<TimerWindowManager | null>(null);
 
     useEffect(() => {
@@ -118,57 +118,10 @@ export default function TaskList() {
         ));
     };
 
-    // Drag and Drop handlers
-    const handleDragStart = (e: React.DragEvent, taskId: string) => {
-        setDraggedTaskId(taskId);
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
-    };
-
-    const handleDragOver = (e: React.DragEvent, taskId: string) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-
-        if (draggedTaskId && draggedTaskId !== taskId) {
-            setDragOverTaskId(taskId);
-        }
-    };
-
-    const handleDragLeave = () => {
-        setDragOverTaskId(null);
-    };
-
-    const handleDrop = (e: React.DragEvent, dropTaskId: string) => {
-        e.preventDefault();
-        setDragOverTaskId(null);
-
-        if (!draggedTaskId || draggedTaskId === dropTaskId) {
-            setDraggedTaskId(null);
-            return;
-        }
-
-        const activeTasks = tasks.filter(t => !t.completed);
+    // Handle reorder for active tasks
+    const handleReorder = (newOrder: Task[]) => {
         const completedTasks = tasks.filter(t => t.completed);
-
-        const draggedIndex = activeTasks.findIndex(t => t.id === draggedTaskId);
-        const dropIndex = activeTasks.findIndex(t => t.id === dropTaskId);
-
-        if (draggedIndex === -1 || dropIndex === -1) {
-            setDraggedTaskId(null);
-            return;
-        }
-
-        const newActiveTasks = [...activeTasks];
-        const [draggedTask] = newActiveTasks.splice(draggedIndex, 1);
-        newActiveTasks.splice(dropIndex, 0, draggedTask);
-
-        setTasks([...newActiveTasks, ...completedTasks]);
-        setDraggedTaskId(null);
-    };
-
-    const handleDragEnd = () => {
-        setDraggedTaskId(null);
-        setDragOverTaskId(null);
+        setTasks([...newOrder, ...completedTasks]);
     };
 
     const activeTasks = tasks.filter(t => !t.completed);
@@ -184,61 +137,118 @@ export default function TaskList() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">30m → 4:47 PM</p>
                 </div>
 
-                <div className="space-y-2 mb-4">
+                <Reorder.Group
+                    axis="y"
+                    values={activeTasks}
+                    onReorder={handleReorder}
+                    className="mb-4"
+                    layoutScroll
+                    style={{ overflowY: 'visible' }}
+                >
                     {activeTasks.map(task => (
                         editingTaskId === task.id ? (
-                            <EditTaskForm
-                                key={task.id}
-                                task={task}
-                                onSave={editTask}
-                                onCancel={() => setEditingTaskId(null)}
-                            />
-                        ) : (
                             <div
                                 key={task.id}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, task.id)}
-                                onDragOver={(e) => handleDragOver(e, task.id)}
-                                onDragLeave={handleDragLeave}
-                                onDrop={(e) => handleDrop(e, task.id)}
-                                onDragEnd={handleDragEnd}
-                                onClick={() => selectTask(task.id)}
-                                className={`flex items-center justify-between p-3 rounded border cursor-move transition-all ${draggedTaskId === task.id
-                                    ? 'opacity-50'
-                                    : ''
-                                    } ${dragOverTaskId === task.id
-                                        ? 'border-blue-400 dark:border-blue-600 border-t-2'
-                                        : ''
-                                    } ${selectedTaskId === task.id
-                                        ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
-                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700'
-                                    }`}
+                                className="mb-2"
+                                style={{
+                                    animation: 'slideDown 0.2s ease-out'
+                                }}
                             >
-                                <div className="flex items-center gap-2">
-                                    <GripVertical size={16} className="text-gray-400 dark:text-gray-500" />
-                                    <span className="text-gray-800 dark:text-gray-200">{task.title}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm text-gray-500 dark:text-gray-400">{task.estimatedTime}m</span>
-                                    <button
-                                        onClick={(e) => startEditTask(task.id, e)}
-                                        className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                        title="Edit task"
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => deleteTask(task.id, e)}
-                                        className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                        title="Delete task"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                                <EditTaskForm
+                                    task={task}
+                                    onSave={editTask}
+                                    onCancel={() => setEditingTaskId(null)}
+                                />
                             </div>
+                        ) : (
+                            <Reorder.Item
+                                key={task.id}
+                                value={task}
+                                className="mb-2"
+                                initial={false}
+                                onDragStart={() => setIsDragging(true)}
+                                onDragEnd={() => {
+                                    setIsDragging(false);
+                                }}
+                                whileDrag={{
+                                    scale: 1.03,
+                                    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.15)",
+                                    zIndex: 999,
+                                    cursor: "grabbing"
+                                }}
+                                animate={{
+                                    scale: 1,
+                                    boxShadow: "0 0 0 rgba(0, 0, 0, 0)"
+                                }}
+                                transition={{
+                                    scale: { duration: 0.2 },
+                                    boxShadow: { duration: 0.2 }
+                                }}
+                                layout
+                                style={{
+                                    position: 'relative',
+                                    listStyle: 'none',
+                                    cursor: 'grab'
+                                }}
+                            >
+                                <div className={`flex items-center justify-between p-3 rounded border transition-colors ${selectedTaskId === task.id
+                                        ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
+                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
+                                    }`}>
+                                    <div
+                                        className="flex items-center gap-2 flex-1"
+                                        onClick={(e) => {
+                                            if (!isDragging) {
+                                                e.stopPropagation();
+                                                selectTask(task.id);
+                                            }
+                                        }}
+                                        onPointerDown={(e) => {
+                                            // Small delay to detect if it's a click or drag
+                                            const pointerDownTime = Date.now();
+                                            const handlePointerUp = () => {
+                                                const timeDiff = Date.now() - pointerDownTime;
+                                                // If released quickly (< 200ms), it's a click
+                                                if (timeDiff < 200 && !isDragging) {
+                                                    selectTask(task.id);
+                                                }
+                                                document.removeEventListener('pointerup', handlePointerUp);
+                                            };
+                                            document.addEventListener('pointerup', handlePointerUp);
+                                        }}
+                                    >
+                                        <GripVertical size={16} className="text-gray-400 dark:text-gray-500" />
+                                        <span className="text-gray-800 dark:text-gray-200 select-none">{task.title}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400 select-none">{task.estimatedTime}m</span>
+                                        <button
+                                            onClick={(e) => startEditTask(task.id, e)}
+                                            className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors z-10"
+                                            title="Edit task"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => deleteTask(task.id, e)}
+                                            className="text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors z-10"
+                                            title="Delete task"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </Reorder.Item>
                         )
                     ))}
+                </Reorder.Group>
 
+                <div
+                    className="mb-4"
+                    style={{
+                        animation: showAddForm ? 'slideDown 0.2s ease-out' : 'none'
+                    }}
+                >
                     {showAddForm ? (
                         <AddTaskForm
                             onAdd={addTask}
