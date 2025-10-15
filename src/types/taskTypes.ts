@@ -8,6 +8,14 @@ export interface Task {
     createdAt: string;
     completedAt?: string;
     scheduledFor?: string;
+    // Timer state
+    timerState?: {
+        isRunning: boolean;
+        remainingTime: number; // in seconds
+        isPaused: boolean;
+        startedAt: string;
+        pausedAt?: string;
+    };
 }
 
 export interface TimerState {
