@@ -17,6 +17,7 @@ export default function TaskList() {
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [timeDisplay, setTimeDisplay] = useState<string>('');
     const timerManagerRef = useRef<TimerWindowManager | null>(null);
 
     useEffect(() => {
@@ -48,6 +49,21 @@ export default function TaskList() {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, []);
+
+    useEffect(() => {
+        if (!mounted) return;
+
+        const updateDisplay = () => {
+            setTimeDisplay(getTimeDisplay());
+        };
+
+        updateDisplay();
+
+        // Update time display every minute
+        const interval = setInterval(updateDisplay, 60000);
+
+        return () => clearInterval(interval);
+    }, [mounted, selectedTaskId, tasks]);
 
     const addTask = (title: string, estimatedTime: number) => {
         const newTask: Task = {
@@ -124,6 +140,42 @@ export default function TaskList() {
         setTasks([...newOrder, ...completedTasks]);
     };
 
+    // Calculate dynamic time display
+    const getTimeDisplay = (): string => {
+        const now = new Date();
+
+        if (selectedTaskId) {
+            const selectedTask = tasks.find(t => t.id === selectedTaskId);
+            if (selectedTask) {
+                const endTime = new Date(now.getTime() + selectedTask.estimatedTime * 60000);
+                const hours = endTime.getHours();
+                const minutes = endTime.getMinutes();
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12;
+                const displayMinutes = minutes.toString().padStart(2, '0');
+                return `${selectedTask.estimatedTime}m → ${displayHours}:${displayMinutes} ${ampm}`;
+            }
+        }
+
+        // If no task selected, show pending tasks info
+        const activeTasks = tasks.filter(t => !t.completed);
+        if (activeTasks.length > 0) {
+            const totalMinutes = activeTasks.reduce((sum, task) => sum + task.estimatedTime, 0);
+            const taskText = activeTasks.length === 1 ? 'task' : 'tasks';
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+
+            if (hours > 0) {
+                return mins > 0
+                    ? `${activeTasks.length} ${taskText} · ${hours}h ${mins}m total`
+                    : `${activeTasks.length} ${taskText} · ${hours}h total`;
+            }
+            return `${activeTasks.length} ${taskText} · ${totalMinutes}m total`;
+        }
+
+        return 'No pending tasks';
+    };
+
     const activeTasks = tasks.filter(t => !t.completed);
     const completedTasks = tasks.filter(t => t.completed);
 
@@ -134,7 +186,7 @@ export default function TaskList() {
             <div className="p-6">
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tasks</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">30m → 4:47 PM</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{timeDisplay}</p>
                 </div>
 
                 <Reorder.Group
@@ -192,8 +244,8 @@ export default function TaskList() {
                                 }}
                             >
                                 <div className={`flex items-center justify-between p-3 rounded border transition-colors ${selectedTaskId === task.id
-                                        ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
-                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
+                                    ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
+                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
                                     }`}>
                                     <div
                                         className="flex items-center gap-2 flex-1"
@@ -267,7 +319,7 @@ export default function TaskList() {
                 {selectedTaskId && (
                     <button
                         onClick={startFocusTimer}
-                        className="w-full mb-4 px-4 py-3 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors font-medium"
+                        className="w-full mb-4 px-4 py-3 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors font-medium"
                     >
                         Start Focus Timer
                     </button>
