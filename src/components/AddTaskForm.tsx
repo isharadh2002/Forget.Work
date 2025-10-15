@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock } from 'lucide-react';
+import DurationSlider from './DurationSlider';
 
 interface AddTaskFormProps {
     onAdd: (title: string, estimatedTime: number) => void;
@@ -22,41 +22,38 @@ export default function AddTaskForm({ onAdd, onCancel }: AddTaskFormProps) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="p-3 border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800">
-            <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Task name"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded mb-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                autoFocus
-            />
-            <div className="flex items-center gap-2 mb-3">
-                <Clock size={16} className="text-gray-400 dark:text-gray-500" />
-                <select
-                    value={time}
-                    onChange={(e) => setTime(Number(e.target.value))}
-                    className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                >
-                    <option value={15}>15m</option>
-                    <option value={30}>30m</option>
-                    <option value={45}>45m</option>
-                    <option value={60}>1h</option>
-                    <option value={90}>1.5h</option>
-                    <option value={120}>2h</option>
-                </select>
+        <form onSubmit={handleSubmit} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div className="mb-3">
+                <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Task title"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    autoFocus
+                />
             </div>
+
+            <div className="mb-4">
+                <DurationSlider
+                    value={time}
+                    onChange={setTime}
+                    min={5}
+                    max={240}
+                />
+            </div>
+
             <div className="flex gap-2">
                 <button
                     type="submit"
-                    className="px-3 py-1.5 bg-blue-600 dark:bg-blue-500 text-white rounded text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+                    className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
                 >
-                    Add
+                    Add Task
                 </button>
                 <button
                     type="button"
                     onClick={onCancel}
-                    className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                 >
                     Cancel
                 </button>
