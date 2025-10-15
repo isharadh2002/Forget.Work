@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Task } from '@/types/taskTypes';
 import { getTasks, saveTasks } from '@/lib/storage';
-import { Trash2, HelpCircle, Settings, RotateCw, Pencil, GripVertical } from 'lucide-react';
+import { Trash2, HelpCircle, Settings, RotateCw, Pencil, GripVertical, Play } from 'lucide-react';
 import AddTaskForm from './AddTaskForm';
 import EditTaskForm from './EditTaskForm';
 import { TimerWindowManager } from '@/lib/timerWindowManager';
@@ -22,9 +22,19 @@ export default function TaskList() {
 
     useEffect(() => {
         setMounted(true);
-        setTasks(getTasks());
+        const loadedTasks = getTasks();
+        setTasks(loadedTasks);
 
-        timerManagerRef.current = new TimerWindowManager(handleCompleteTask);
+        // Check if any task has an active timer state and select it
+        const activeTimerTask = loadedTasks.find(t => t.timerState?.isRunning);
+        if (activeTimerTask) {
+            setSelectedTaskId(activeTimerTask.id);
+        }
+
+        timerManagerRef.current = new TimerWindowManager(
+            handleCompleteTask,
+            handleTimerStateChange
+        );
 
         return () => {
             if (timerManagerRef.current) {
@@ -43,6 +53,12 @@ export default function TaskList() {
         const handleMessage = (event: MessageEvent) => {
             if (event.data.type === 'TASK_COMPLETE') {
                 handleCompleteTask(event.data.taskId, event.data.actualTime);
+            } else if (event.data.type === 'TIMER_STATE_CHANGE') {
+                handleTimerStateChange(
+                    event.data.taskId,
+                    event.data.remainingTime,
+                    event.data.isPaused
+                );
             }
         };
 
@@ -64,6 +80,23 @@ export default function TaskList() {
 
         return () => clearInterval(interval);
     }, [mounted, selectedTaskId, tasks]);
+
+    const handleTimerStateChange = (taskId: string, remainingTime: number, isPaused: boolean) => {
+        setTasks(prevTasks => prevTasks.map(t =>
+            t.id === taskId
+                ? {
+                    ...t,
+                    timerState: {
+                        isRunning: true,
+                        remainingTime,
+                        isPaused,
+                        startedAt: t.timerState?.startedAt || new Date().toISOString(),
+                        pausedAt: isPaused ? new Date().toISOString() : undefined
+                    }
+                }
+                : t
+        ));
+    };
 
     const addTask = (title: string, estimatedTime: number) => {
         const newTask: Task = {
@@ -111,6 +144,32 @@ export default function TaskList() {
         const task = tasks.find(t => t.id === selectedTaskId);
         if (!task) return;
 
+        // Update task to mark timer as running
+        setTasks(prevTasks => prevTasks.map(t =>
+            t.id === selectedTaskId
+                ? {
+                    ...t,
+                    timerState: {
+                        isRunning: true,
+                        remainingTime: t.timerState?.remainingTime ?? t.estimatedTime * 60,
+                        isPaused: false,
+                        startedAt: new Date().toISOString()
+                    }
+                }
+                : t
+        ));
+
+        if (timerManagerRef.current) {
+            timerManagerRef.current.openTimer(task);
+        }
+    };
+
+    const resumeTimer = (taskId: string) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        setSelectedTaskId(taskId);
+
         if (timerManagerRef.current) {
             timerManagerRef.current.openTimer(task);
         }
@@ -119,7 +178,13 @@ export default function TaskList() {
     const handleCompleteTask = (taskId: string, actualTime: number) => {
         setTasks(prevTasks => prevTasks.map(t =>
             t.id === taskId
-                ? { ...t, completed: true, actualTime, completedAt: new Date().toISOString() }
+                ? {
+                    ...t,
+                    completed: true,
+                    actualTime,
+                    completedAt: new Date().toISOString(),
+                    timerState: undefined // Clear timer state on completion
+                }
                 : t
         ));
         setSelectedTaskId(null);
@@ -129,7 +194,13 @@ export default function TaskList() {
         e.stopPropagation();
         setTasks(prevTasks => prevTasks.map(t =>
             t.id === taskId
-                ? { ...t, completed: false, actualTime: undefined, completedAt: undefined }
+                ? {
+                    ...t,
+                    completed: false,
+                    actualTime: undefined,
+                    completedAt: undefined,
+                    timerState: undefined
+                }
                 : t
         ));
     };
@@ -147,6 +218,13 @@ export default function TaskList() {
         if (selectedTaskId) {
             const selectedTask = tasks.find(t => t.id === selectedTaskId);
             if (selectedTask) {
+                // If task has active timer state, show remaining time
+                if (selectedTask.timerState?.isRunning) {
+                    const mins = Math.floor(selectedTask.timerState.remainingTime / 60);
+                    const secs = selectedTask.timerState.remainingTime % 60;
+                    return `Timer: ${mins}:${secs.toString().padStart(2, '0')} ${selectedTask.timerState.isPaused ? '(Paused)' : ''}`;
+                }
+
                 const endTime = new Date(now.getTime() + selectedTask.estimatedTime * 60000);
                 const hours = endTime.getHours();
                 const minutes = endTime.getMinutes();
@@ -245,7 +323,9 @@ export default function TaskList() {
                             >
                                 <div className={`flex items-center justify-between p-3 rounded border transition-colors ${selectedTaskId === task.id
                                     ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
-                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
+                                    : task.timerState?.isRunning
+                                        ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-400 dark:border-yellow-600'
+                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
                                     }`}>
                                     <div
                                         className="flex items-center gap-2 flex-1"
@@ -271,9 +351,31 @@ export default function TaskList() {
                                     >
                                         <GripVertical size={16} className="text-gray-400 dark:text-gray-500" />
                                         <span className="text-gray-800 dark:text-gray-200 select-none">{task.title}</span>
+                                        {task.timerState?.isRunning && (
+                                            <span className="text-xs px-2 py-0.5 bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded-full">
+                                                {task.timerState.isPaused ? 'Paused' : 'Running'}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                                        <span className="text-sm text-gray-500 dark:text-gray-400 select-none">{task.estimatedTime}m</span>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400 select-none">
+                                            {task.timerState?.isRunning
+                                                ? `${Math.floor(task.timerState.remainingTime / 60)}m`
+                                                : `${task.estimatedTime}m`
+                                            }
+                                        </span>
+                                        {task.timerState?.isRunning && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    resumeTimer(task.id);
+                                                }}
+                                                className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 transition-colors z-10"
+                                                title="Resume timer"
+                                            >
+                                                <Play size={16} />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={(e) => startEditTask(task.id, e)}
                                             className="text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors z-10"
@@ -321,7 +423,10 @@ export default function TaskList() {
                         onClick={startFocusTimer}
                         className="w-full mb-4 px-4 py-3 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors font-medium"
                     >
-                        Start Focus Timer
+                        {tasks.find(t => t.id === selectedTaskId)?.timerState?.isRunning
+                            ? 'Resume Focus Timer'
+                            : 'Start Focus Timer'
+                        }
                     </button>
                 )}
 

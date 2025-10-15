@@ -15,12 +15,29 @@ export class TimerWindowManager {
     private pipWindow: Window | null = null;
     private timerInterval: NodeJS.Timeout | null = null;
     private onCompleteCallback: (taskId: string, actualTime: number) => void;
+    private onStateChangeCallback: (taskId: string, remainingTime: number, isPaused: boolean) => void;
+    private currentTaskId: string | null = null;
 
-    constructor(onComplete: (taskId: string, actualTime: number) => void) {
+    constructor(
+        onComplete: (taskId: string, actualTime: number) => void,
+        onStateChange: (taskId: string, remainingTime: number, isPaused: boolean) => void
+    ) {
         this.onCompleteCallback = onComplete;
+        this.onStateChangeCallback = onStateChange;
     }
 
     async openTimer(task: Task): Promise<void> {
+        // If timer is already running for this task, don't open another
+        if (this.currentTaskId === task.id && this.pipWindow && !this.pipWindow.closed) {
+            this.pipWindow.focus();
+            return;
+        }
+
+        // Clean up any existing timer
+        this.cleanup();
+
+        this.currentTaskId = task.id;
+
         // Check if Document Picture-in-Picture is supported
         if ('documentPictureInPicture' in window) {
             try {
@@ -67,8 +84,10 @@ export class TimerWindowManager {
     }
 
     private createPipTimerUI(pipWindow: Window, task: Task): void {
-        let remainingTime = task.estimatedTime * 60;
-        let isPaused = false;
+        // Use saved timer state if available, otherwise use estimated time
+        let remainingTime = task.timerState?.remainingTime ?? task.estimatedTime * 60;
+        let isPaused = task.timerState?.isPaused ?? false;
+        const totalTime = task.estimatedTime * 60;
 
         const container = pipWindow.document.createElement('div');
         container.style.cssText = `
@@ -130,7 +149,7 @@ export class TimerWindowManager {
         `;
 
         const pauseButton = pipWindow.document.createElement('button');
-        pauseButton.textContent = 'Pause';
+        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
         pauseButton.style.cssText = `
             padding: 8px 16px;
             background: #f3f4f6;
@@ -159,10 +178,10 @@ export class TimerWindowManager {
             const seconds = remainingTime % 60;
             timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-            const progress = ((task.estimatedTime * 60 - remainingTime) / (task.estimatedTime * 60)) * 100;
+            const progress = ((totalTime - remainingTime) / totalTime) * 100;
             progressFill.style.width = `${progress}%`;
 
-            const isLowTime = remainingTime <= task.estimatedTime * 60 * 0.2;
+            const isLowTime = remainingTime <= totalTime * 0.2;
             progressFill.style.background = isLowTime ? '#ef4444' : '#22c55e';
             timerDisplay.style.color = isLowTime ? '#ef4444' : '#1a1a1a';
         };
@@ -170,12 +189,15 @@ export class TimerWindowManager {
         pauseButton.onclick = () => {
             isPaused = !isPaused;
             pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+            // Save state when paused/resumed
+            this.onStateChangeCallback(task.id, remainingTime, isPaused);
         };
 
         completeButton.onclick = () => {
-            const actualTime = task.estimatedTime * 60 - remainingTime;
+            const actualTime = totalTime - remainingTime;
             this.onCompleteCallback(task.id, actualTime);
             if (this.timerInterval) clearInterval(this.timerInterval);
+            this.currentTaskId = null;
             pipWindow.close();
         };
 
@@ -184,9 +206,15 @@ export class TimerWindowManager {
                 remainingTime--;
                 updateTimer();
 
+                // Save state every 5 seconds
+                if (remainingTime % 5 === 0) {
+                    this.onStateChangeCallback(task.id, remainingTime, isPaused);
+                }
+
                 if (remainingTime === 0) {
-                    this.onCompleteCallback(task.id, task.estimatedTime * 60);
+                    this.onCompleteCallback(task.id, totalTime);
                     if (this.timerInterval) clearInterval(this.timerInterval);
+                    this.currentTaskId = null;
                     pipWindow.close();
                 }
             }
@@ -205,15 +233,22 @@ export class TimerWindowManager {
         pipWindow.document.body.style.margin = '0';
         pipWindow.document.body.style.padding = '0';
 
-        // Cleanup when PiP window closes
-        pipWindow.addEventListener('unload', () => {
+        // Save state when window closes
+        pipWindow.addEventListener('beforeunload', () => {
             if (this.timerInterval) {
                 clearInterval(this.timerInterval);
             }
+            // Save final state before closing
+            this.onStateChangeCallback(task.id, remainingTime, isPaused);
+            this.currentTaskId = null;
         });
     }
 
     private openRegularPopup(task: Task): void {
+        // Use saved timer state if available
+        const initialTime = task.timerState?.remainingTime ?? task.estimatedTime * 60;
+        const initialPaused = task.timerState?.isPaused ?? false;
+
         const popupWindow = window.open(
             '',
             'FocusTimer',
@@ -221,6 +256,8 @@ export class TimerWindowManager {
         );
 
         if (popupWindow) {
+            this.pipWindow = popupWindow;
+
             popupWindow.document.write(`
                 <!DOCTYPE html>
                 <html>
@@ -273,13 +310,14 @@ export class TimerWindowManager {
                         <div class="progress-fill" id="progress"></div>
                     </div>
                     <div class="buttons">
-                        <button class="pause-btn" onclick="togglePause()">Pause</button>
+                        <button class="pause-btn" id="pauseBtn">Pause</button>
                         <button class="complete-btn" onclick="completeTask()">Complete</button>
                     </div>
                     <script>
-                        let remainingTime = ${task.estimatedTime * 60};
-                        let isPaused = false;
+                        let remainingTime = ${initialTime};
+                        let isPaused = ${initialPaused};
                         const totalTime = ${task.estimatedTime * 60};
+                        let stateUpdateCounter = 0;
                         
                         function updateDisplay() {
                             const mins = Math.floor(remainingTime / 60);
@@ -293,7 +331,14 @@ export class TimerWindowManager {
                         
                         function togglePause() {
                             isPaused = !isPaused;
-                            event.target.textContent = isPaused ? 'Resume' : 'Pause';
+                            document.getElementById('pauseBtn').textContent = isPaused ? 'Resume' : 'Pause';
+                            // Notify parent of state change
+                            window.opener.postMessage({
+                                type: 'TIMER_STATE_CHANGE',
+                                taskId: '${task.id}',
+                                remainingTime: remainingTime,
+                                isPaused: isPaused
+                            }, '*');
                         }
                         
                         function completeTask() {
@@ -305,17 +350,45 @@ export class TimerWindowManager {
                             window.close();
                         }
                         
+                        document.getElementById('pauseBtn').onclick = togglePause;
+                        
                         setInterval(() => {
                             if (!isPaused && remainingTime > 0) {
                                 remainingTime--;
                                 updateDisplay();
+                                
+                                // Save state every 5 seconds
+                                stateUpdateCounter++;
+                                if (stateUpdateCounter >= 5) {
+                                    stateUpdateCounter = 0;
+                                    window.opener.postMessage({
+                                        type: 'TIMER_STATE_CHANGE',
+                                        taskId: '${task.id}',
+                                        remainingTime: remainingTime,
+                                        isPaused: isPaused
+                                    }, '*');
+                                }
+                                
                                 if (remainingTime === 0) {
                                     completeTask();
                                 }
                             }
                         }, 1000);
                         
+                        // Save state before closing
+                        window.addEventListener('beforeunload', () => {
+                            window.opener.postMessage({
+                                type: 'TIMER_STATE_CHANGE',
+                                taskId: '${task.id}',
+                                remainingTime: remainingTime,
+                                isPaused: isPaused
+                            }, '*');
+                        });
+                        
                         updateDisplay();
+                        if (isPaused) {
+                            document.getElementById('pauseBtn').textContent = 'Resume';
+                        }
                     </script>
                 </body>
                 </html>
@@ -326,12 +399,17 @@ export class TimerWindowManager {
         }
     }
 
+    isTimerActive(taskId: string): boolean {
+        return this.currentTaskId === taskId && this.pipWindow !== null && !this.pipWindow.closed;
+    }
+
     cleanup(): void {
-        if (this.pipWindow) {
+        if (this.pipWindow && !this.pipWindow.closed) {
             this.pipWindow.close();
         }
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
         }
+        this.currentTaskId = null;
     }
 }
