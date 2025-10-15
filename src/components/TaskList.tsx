@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Task } from '@/types/taskTypes';
-import { getTasks, saveTasks } from '@/lib/storage';
+import { getTasks, saveTasks, formatDuration } from '@/lib/storage';
 import { Trash2, HelpCircle, Settings, RotateCw, Pencil, GripVertical, Play } from 'lucide-react';
 import AddTaskForm from './AddTaskForm';
 import EditTaskForm from './EditTaskForm';
@@ -231,7 +231,7 @@ export default function TaskList() {
                 const ampm = hours >= 12 ? 'PM' : 'AM';
                 const displayHours = hours % 12 || 12;
                 const displayMinutes = minutes.toString().padStart(2, '0');
-                return `${selectedTask.estimatedTime}m → ${displayHours}:${displayMinutes} ${ampm}`;
+                return `${formatDuration(selectedTask.estimatedTime)} → ${displayHours}:${displayMinutes} ${ampm}`;
             }
         }
 
@@ -240,18 +240,32 @@ export default function TaskList() {
         if (activeTasks.length > 0) {
             const totalMinutes = activeTasks.reduce((sum, task) => sum + task.estimatedTime, 0);
             const taskText = activeTasks.length === 1 ? 'task' : 'tasks';
-            const hours = Math.floor(totalMinutes / 60);
-            const mins = totalMinutes % 60;
-
-            if (hours > 0) {
-                return mins > 0
-                    ? `${activeTasks.length} ${taskText} · ${hours}h ${mins}m total`
-                    : `${activeTasks.length} ${taskText} · ${hours}h total`;
-            }
-            return `${activeTasks.length} ${taskText} · ${totalMinutes}m total`;
+            return `${activeTasks.length} ${taskText} · ${formatDuration(totalMinutes)} total`;
         }
 
         return 'No pending tasks';
+    };
+
+    // Format time for task display (used in the task list items)
+    const formatTaskTime = (minutes: number): string => {
+        return formatDuration(minutes);
+    };
+
+    // Format actual time in seconds for completed tasks
+    const formatActualTime = (seconds: number): string => {
+        const totalMinutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+
+        if (totalMinutes >= 60) {
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            if (mins > 0) {
+                return `${hours}h ${mins}m ${secs}s`;
+            }
+            return `${hours}h ${secs}s`;
+        }
+
+        return `${totalMinutes}m ${secs}s`;
     };
 
     const activeTasks = tasks.filter(t => !t.completed);
@@ -360,8 +374,8 @@ export default function TaskList() {
                                     <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                                         <span className="text-sm text-gray-500 dark:text-gray-400 select-none">
                                             {task.timerState?.isRunning
-                                                ? `${Math.floor(task.timerState.remainingTime / 60)}m`
-                                                : `${task.estimatedTime}m`
+                                                ? formatTaskTime(Math.floor(task.timerState.remainingTime / 60))
+                                                : formatTaskTime(task.estimatedTime)
                                             }
                                         </span>
                                         {task.timerState?.isRunning && (
@@ -445,7 +459,7 @@ export default function TaskList() {
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="text-xs text-gray-400 dark:text-gray-500">
-                                            {task.actualTime ? `${Math.floor(task.actualTime / 60)}m ${task.actualTime % 60}s` : `${task.estimatedTime}m`}
+                                            {task.actualTime ? formatActualTime(task.actualTime) : formatTaskTime(task.estimatedTime)}
                                         </span>
                                         <button
                                             onClick={(e) => moveTaskToPending(task.id, e)}
