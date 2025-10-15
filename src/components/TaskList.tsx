@@ -331,39 +331,27 @@ export default function TaskList() {
                                 layout
                                 style={{
                                     position: 'relative',
-                                    listStyle: 'none',
-                                    cursor: 'grab'
+                                    listStyle: 'none'
                                 }}
                             >
-                                <div className={`flex items-center justify-between p-3 rounded border transition-colors ${selectedTaskId === task.id
-                                    ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
-                                    : task.timerState?.isRunning
-                                        ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-400 dark:border-yellow-600'
-                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
-                                    }`}>
-                                    <div
-                                        className="flex items-center gap-2 flex-1"
-                                        onClick={(e) => {
-                                            if (!isDragging) {
-                                                e.stopPropagation();
-                                                selectTask(task.id);
-                                            }
-                                        }}
-                                        onPointerDown={(e) => {
-                                            // Small delay to detect if it's a click or drag
-                                            const pointerDownTime = Date.now();
-                                            const handlePointerUp = () => {
-                                                const timeDiff = Date.now() - pointerDownTime;
-                                                // If released quickly (< 200ms), it's a click
-                                                if (timeDiff < 200 && !isDragging) {
-                                                    selectTask(task.id);
-                                                }
-                                                document.removeEventListener('pointerup', handlePointerUp);
-                                            };
-                                            document.addEventListener('pointerup', handlePointerUp);
-                                        }}
-                                    >
-                                        <GripVertical size={16} className="text-gray-400 dark:text-gray-500" />
+                                <div
+                                    className={`flex items-center justify-between p-3 rounded border transition-colors cursor-grab active:cursor-grabbing ${selectedTaskId === task.id
+                                        ? 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-600 ring-2 ring-blue-400 dark:ring-blue-600'
+                                        : task.timerState?.isRunning
+                                            ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-400 dark:border-yellow-600'
+                                            : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900'
+                                        }`}
+                                    onClick={() => {
+                                        if (!isDragging) {
+                                            selectTask(task.id);
+                                        }
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2 flex-1 pointer-events-none">
+                                        <GripVertical
+                                            size={16}
+                                            className="text-gray-400 dark:text-gray-500 pointer-events-auto cursor-grab"
+                                        />
                                         <span className="text-gray-800 dark:text-gray-200 select-none">{task.title}</span>
                                         {task.timerState?.isRunning && (
                                             <span className="text-xs px-2 py-0.5 bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded-full">
@@ -371,8 +359,8 @@ export default function TaskList() {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                                        <span className="text-sm text-gray-500 dark:text-gray-400 select-none">
+                                    <div className="flex items-center gap-3 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400 select-none pointer-events-none">
                                             {task.timerState?.isRunning
                                                 ? formatTaskTime(Math.floor(task.timerState.remainingTime / 60))
                                                 : formatTaskTime(task.estimatedTime)
