@@ -42,8 +42,8 @@ export class TimerWindowManager {
         if ('documentPictureInPicture' in window) {
             try {
                 const pipWindow = await window.documentPictureInPicture!.requestWindow({
-                    width: 400,
-                    height: 300,
+                    width: 420,
+                    height: 120,
                 });
 
                 this.pipWindow = pipWindow;
@@ -83,6 +83,17 @@ export class TimerWindowManager {
         });
     }
 
+    private formatTime(seconds: number): string {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+
     private createPipTimerUI(pipWindow: Window, task: Task): void {
         // Use saved timer state if available, otherwise use estimated time
         let remainingTime = task.timerState?.remainingTime ?? task.estimatedTime * 60;
@@ -97,99 +108,110 @@ export class TimerWindowManager {
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: white;
+            background: #ffffff;
             padding: 20px;
             box-sizing: border-box;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            gap: 12px;
         `;
 
         const title = pipWindow.document.createElement('div');
         title.textContent = task.title;
         title.style.cssText = `
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 500;
             color: #333;
-            margin-bottom: 10px;
             text-align: center;
+            width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        `;
+
+        const timerRow = pipWindow.document.createElement('div');
+        timerRow.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
         `;
 
         const timerDisplay = pipWindow.document.createElement('div');
         timerDisplay.style.cssText = `
-            font-size: 48px;
-            font-weight: bold;
+            font-size: 32px;
+            font-weight: 700;
             color: #1a1a1a;
-            margin: 20px 0;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.5px;
         `;
-
-        const progressBar = pipWindow.document.createElement('div');
-        progressBar.style.cssText = `
-            width: 100%;
-            height: 8px;
-            background: #e5e5e5;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 20px 0;
-        `;
-
-        const progressFill = pipWindow.document.createElement('div');
-        progressFill.style.cssText = `
-            height: 100%;
-            background: #22c55e;
-            border-radius: 4px;
-            transition: width 0.3s ease, background 0.3s ease;
-            width: 0%;
-        `;
-        progressBar.appendChild(progressFill);
 
         const buttonContainer = pipWindow.document.createElement('div');
         buttonContainer.style.cssText = `
             display: flex;
-            gap: 10px;
-            margin-top: 20px;
+            gap: 8px;
         `;
 
         const pauseButton = pipWindow.document.createElement('button');
-        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+        pauseButton.innerHTML = isPaused ? '&#9654;' : '&#10074;&#10074;';
         pauseButton.style.cssText = `
-            padding: 8px 16px;
+            width: 40px;
+            height: 40px;
             background: #f3f4f6;
-            border: none;
+            border: 1px solid #e5e7eb;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 500;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
         `;
+        pauseButton.onmouseover = () => {
+            pauseButton.style.background = '#e5e7eb';
+            pauseButton.style.transform = 'scale(1.05)';
+        };
+        pauseButton.onmouseout = () => {
+            pauseButton.style.background = '#f3f4f6';
+            pauseButton.style.transform = 'scale(1)';
+        };
 
         const completeButton = pipWindow.document.createElement('button');
-        completeButton.textContent = 'Complete';
+        completeButton.innerHTML = '&#10003;';
         completeButton.style.cssText = `
-            padding: 8px 16px;
+            width: 40px;
+            height: 40px;
             background: #22c55e;
-            color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
         `;
+        completeButton.onmouseover = () => {
+            completeButton.style.background = '#16a34a';
+            completeButton.style.transform = 'scale(1.05)';
+        };
+        completeButton.onmouseout = () => {
+            completeButton.style.background = '#22c55e';
+            completeButton.style.transform = 'scale(1)';
+        };
 
         const updateTimer = () => {
-            const minutes = Math.floor(remainingTime / 60);
-            const seconds = remainingTime % 60;
-            timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-            const progress = ((totalTime - remainingTime) / totalTime) * 100;
-            progressFill.style.width = `${progress}%`;
+            timerDisplay.textContent = this.formatTime(remainingTime);
 
             const isLowTime = remainingTime <= totalTime * 0.2;
-            progressFill.style.background = isLowTime ? '#ef4444' : '#22c55e';
             timerDisplay.style.color = isLowTime ? '#ef4444' : '#1a1a1a';
         };
 
         pauseButton.onclick = () => {
             isPaused = !isPaused;
-            pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
-            // Save state when paused/resumed
+            pauseButton.innerHTML = isPaused ? '&#9654;' : '&#10074;&#10074;';
             this.onStateChangeCallback(task.id, remainingTime, isPaused);
         };
 
@@ -206,7 +228,6 @@ export class TimerWindowManager {
                 remainingTime--;
                 updateTimer();
 
-                // Save state every 5 seconds
                 if (remainingTime % 5 === 0) {
                     this.onStateChangeCallback(task.id, remainingTime, isPaused);
                 }
@@ -223,40 +244,54 @@ export class TimerWindowManager {
         updateTimer();
 
         container.appendChild(title);
-        container.appendChild(timerDisplay);
-        container.appendChild(progressBar);
+        timerRow.appendChild(timerDisplay);
+        timerRow.appendChild(buttonContainer);
         buttonContainer.appendChild(pauseButton);
         buttonContainer.appendChild(completeButton);
-        container.appendChild(buttonContainer);
+        container.appendChild(timerRow);
 
         pipWindow.document.body.appendChild(container);
         pipWindow.document.body.style.margin = '0';
         pipWindow.document.body.style.padding = '0';
+        pipWindow.document.body.style.overflow = 'auto';
 
-        // Save state when window closes
+        // Hide scrollbars but keep scrolling functionality
+        const style = pipWindow.document.createElement('style');
+        style.textContent = `
+            body::-webkit-scrollbar {
+                display: none;
+            }
+            body {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        `;
+        pipWindow.document.head.appendChild(style);
+
         pipWindow.addEventListener('beforeunload', () => {
             if (this.timerInterval) {
                 clearInterval(this.timerInterval);
             }
-            // Save final state before closing
             this.onStateChangeCallback(task.id, remainingTime, isPaused);
             this.currentTaskId = null;
         });
     }
 
     private openRegularPopup(task: Task): void {
-        // Use saved timer state if available
         const initialTime = task.timerState?.remainingTime ?? task.estimatedTime * 60;
         const initialPaused = task.timerState?.isPaused ?? false;
 
         const popupWindow = window.open(
             '',
             'FocusTimer',
-            'width=400,height=300,left=100,top=100'
+            'width=420,height=120,left=100,top=100,resizable=no,scrollbars=no'
         );
 
         if (popupWindow) {
             this.pipWindow = popupWindow;
+
+            // Force window size after opening
+            popupWindow.resizeTo(420, 120);
 
             popupWindow.document.write(`
                 <!DOCTYPE html>
@@ -264,54 +299,107 @@ export class TimerWindowManager {
                 <head>
                     <title>Focus Timer - ${task.title}</title>
                     <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        html, body {
+                            height: 100%;
+                            overflow: auto;
+                        }
+                        /* Hide scrollbars but keep scrolling */
+                        body::-webkit-scrollbar {
+                            display: none;
+                        }
                         body {
-                            margin: 0;
-                            padding: 20px;
+                            -ms-overflow-style: none;
+                            scrollbar-width: none;
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        .container {
                             display: flex;
                             flex-direction: column;
                             align-items: center;
                             justify-content: center;
-                            height: 100vh;
-                            background: white;
-                        }
-                        .title { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
-                        .timer { font-size: 48px; font-weight: bold; margin: 20px 0; }
-                        .progress-bar {
                             width: 100%;
-                            height: 8px;
-                            background: #e5e5e5;
-                            border-radius: 4px;
-                            overflow: hidden;
-                            margin: 20px 0;
-                        }
-                        .progress-fill {
                             height: 100%;
-                            background: #22c55e;
-                            transition: width 0.3s ease;
+                            padding: 20px;
+                            gap: 12px;
+                            background: #ffffff;
                         }
-                        .buttons { display: flex; gap: 10px; margin-top: 20px; }
-                        button {
-                            padding: 8px 16px;
-                            border: none;
-                            border-radius: 8px;
-                            cursor: pointer;
+                        .title {
                             font-size: 14px;
                             font-weight: 500;
+                            color: #333;
+                            text-align: center;
+                            width: 100%;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
                         }
-                        .pause-btn { background: #f3f4f6; }
-                        .complete-btn { background: #22c55e; color: white; }
+                        .timer-row {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 16px;
+                        }
+                        .timer {
+                            font-size: 32px;
+                            font-weight: 700;
+                            color: #1a1a1a;
+                            font-variant-numeric: tabular-nums;
+                            letter-spacing: 0.5px;
+                        }
+                        .timer.low-time {
+                            color: #ef4444;
+                        }
+                        .buttons {
+                            display: flex;
+                            gap: 8px;
+                        }
+                        button {
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            transition: all 0.2s ease;
+                        }
+                        .pause-btn {
+                            background: #f3f4f6;
+                            border: 1px solid #e5e7eb;
+                            color: #374151;
+                            font-size: 14px;
+                        }
+                        .pause-btn:hover {
+                            background: #e5e7eb;
+                            transform: scale(1.05);
+                        }
+                        .complete-btn {
+                            background: #22c55e;
+                            border: none;
+                            color: #ffffff;
+                            font-size: 18px;
+                            font-weight: bold;
+                        }
+                        .complete-btn:hover {
+                            background: #16a34a;
+                            transform: scale(1.05);
+                        }
                     </style>
                 </head>
                 <body>
-                    <div class="title">${task.title}</div>
-                    <div class="timer" id="timer">30:00</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress"></div>
-                    </div>
-                    <div class="buttons">
-                        <button class="pause-btn" id="pauseBtn">Pause</button>
-                        <button class="complete-btn" onclick="completeTask()">Complete</button>
+                    <div class="container">
+                        <div class="title">${task.title}</div>
+                        <div class="timer-row">
+                            <div class="timer" id="timer">0:00</div>
+                            <div class="buttons">
+                                <button class="pause-btn" id="pauseBtn">&#10074;&#10074;</button>
+                                <button class="complete-btn" onclick="completeTask()">&#10003;</button>
+                            </div>
+                        </div>
                     </div>
                     <script>
                         let remainingTime = ${initialTime};
@@ -319,20 +407,34 @@ export class TimerWindowManager {
                         const totalTime = ${task.estimatedTime * 60};
                         let stateUpdateCounter = 0;
                         
-                        function updateDisplay() {
-                            const mins = Math.floor(remainingTime / 60);
-                            const secs = remainingTime % 60;
-                            document.getElementById('timer').textContent = 
-                                mins + ':' + secs.toString().padStart(2, '0');
+                        function formatTime(seconds) {
+                            const hours = Math.floor(seconds / 3600);
+                            const minutes = Math.floor((seconds % 3600) / 60);
+                            const secs = seconds % 60;
                             
-                            const progress = ((totalTime - remainingTime) / totalTime) * 100;
-                            document.getElementById('progress').style.width = progress + '%';
+                            if (hours > 0) {
+                                return hours + ':' + 
+                                       minutes.toString().padStart(2, '0') + ':' + 
+                                       secs.toString().padStart(2, '0');
+                            }
+                            return minutes + ':' + secs.toString().padStart(2, '0');
+                        }
+                        
+                        function updateDisplay() {
+                            const timerEl = document.getElementById('timer');
+                            timerEl.textContent = formatTime(remainingTime);
+                            
+                            const isLowTime = remainingTime <= totalTime * 0.2;
+                            if (isLowTime) {
+                                timerEl.classList.add('low-time');
+                            } else {
+                                timerEl.classList.remove('low-time');
+                            }
                         }
                         
                         function togglePause() {
                             isPaused = !isPaused;
-                            document.getElementById('pauseBtn').textContent = isPaused ? 'Resume' : 'Pause';
-                            // Notify parent of state change
+                            document.getElementById('pauseBtn').innerHTML = isPaused ? '&#9654;' : '&#10074;&#10074;';
                             window.opener.postMessage({
                                 type: 'TIMER_STATE_CHANGE',
                                 taskId: '${task.id}',
@@ -357,7 +459,6 @@ export class TimerWindowManager {
                                 remainingTime--;
                                 updateDisplay();
                                 
-                                // Save state every 5 seconds
                                 stateUpdateCounter++;
                                 if (stateUpdateCounter >= 5) {
                                     stateUpdateCounter = 0;
@@ -375,7 +476,6 @@ export class TimerWindowManager {
                             }
                         }, 1000);
                         
-                        // Save state before closing
                         window.addEventListener('beforeunload', () => {
                             window.opener.postMessage({
                                 type: 'TIMER_STATE_CHANGE',
@@ -387,7 +487,7 @@ export class TimerWindowManager {
                         
                         updateDisplay();
                         if (isPaused) {
-                            document.getElementById('pauseBtn').textContent = 'Resume';
+                            document.getElementById('pauseBtn').innerHTML = '&#9654;';
                         }
                     </script>
                 </body>
